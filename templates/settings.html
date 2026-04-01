@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">System Settings</h1>
+</div>
+
+<div class="panel mb-4">
+    <div class="panel-header">
+        <span class="panel-title">Enforcement Configuration</span>
+    </div>
+    <div class="panel-body">
+        <div class="form-row">
+            <div class="form-group">
+                <label class="form-label">System Status</label>
+                <div class="toggle-wrap">
+                    <label class="toggle">
+                        <input type="checkbox" id="system-enabled" {% if system_enabled %}checked{% endif %} onchange="saveSettings()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span id="system-status-text">{{ "Active — Processing violations" if system_enabled else "Disabled — No tickets will be issued" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-row mt-4">
+            <div class="form-group">
+                <label class="form-label" for="leniency">Leniency Threshold (MPH over limit)</label>
+                <input type="number" id="leniency" class="form-input form-input-sm" value="{{ leniency }}" min="0" max="50" onchange="saveSettings()">
+                <div class="form-hint">
+                    Vehicles traveling at or below the speed limit + this value will NOT receive a ticket.
+                    <br>Example: If the limit is 70 mph and leniency is {{ leniency }} mph, only vehicles exceeding {{ 70 + leniency|int }} mph will be cited.
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label" for="dedup-window">Deduplication Window (minutes)</label>
+                <input type="number" id="dedup-window" class="form-input form-input-sm" value="{{ dedup_window }}" min="0" max="1440" onchange="saveSettings()">
+                <div class="form-hint">
+                    If a vehicle was issued a ticket within this many minutes, a new violation will be suppressed instead of issued.
+                    <br>This prevents duplicate citations for the same driver (e.g., if pulled over recently).
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Toll Segments</span>
+        <span class="text-muted text-sm">Defined checkpoint corridors</span>
+    </div>
+    <div class="panel-body">
+        {% if segments %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Entry Booth</th>
+                        <th>Exit Booth</th>
+                        <th>Distance (mi)</th>
+                        <th>Speed Limit (mph)</th>
+                        <th>Leniency Threshold</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in segments %}
+                    <tr>
+                        <td>{{ s.id }}</td>
+                        <td>
+                            <strong>{{ s.booth_a_name }}</strong>
+                            <div class="text-sm text-muted">{{ s.booth_a_location }}</div>
+                        </td>
+                        <td>
+                            <strong>{{ s.booth_b_name }}</strong>
+                            <div class="text-sm text-muted">{{ s.booth_b_location }}</div>
+                        </td>
+                        <td>{{ s.distance_miles }} mi</td>
+                        <td>{{ s.speed_limit_mph }} mph</td>
+                        <td class="leniency-threshold">{{ s.speed_limit_mph + leniency|int }} mph</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No toll segments configured.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

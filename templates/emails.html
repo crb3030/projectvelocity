@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Email Log{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Simulated Email Log</h1>
+    <span class="text-muted text-sm">Emails that would be sent to vehicle owners</span>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">{{ emails|length }} Email{{ 's' if emails|length != 1 }}</span>
+    </div>
+    <div class="panel-body">
+        {% if emails %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Recipient</th>
+                        <th>Email</th>
+                        <th>Subject</th>
+                        <th>Plate</th>
+                        <th>Speed</th>
+                        <th>Limit</th>
+                        <th>Sent At</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in emails %}
+                    <tr>
+                        <td>#{{ e.id }}</td>
+                        <td><strong>{{ e.recipient_name }}</strong></td>
+                        <td>{{ e.recipient_email }}</td>
+                        <td>{{ e.subject }}</td>
+                        <td>{{ e.license_plate }}</td>
+                        <td class="speed-over">{{ e.calculated_speed_mph }} mph</td>
+                        <td>{{ e.speed_limit_mph }} mph</td>
+                        <td class="text-sm text-muted">{{ e.simulated_sent_at }}</td>
+                        <td>
+                            <button class="btn btn-secondary btn-sm" onclick="showEmail({{ e.id }})">
+                                View
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No emails have been generated yet. Process transactions from the Dashboard to generate violation emails.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

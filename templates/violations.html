@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Violations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Violations Log</h1>
+</div>
+
+<div class="panel mb-4">
+    <div class="panel-body">
+        <form class="filters" method="GET" action="/violations">
+            <label class="form-label" style="margin-bottom:0">Status:</label>
+            <select name="status" class="form-select" onchange="this.form.submit()">
+                <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Statuses</option>
+                <option value="issued" {% if status_filter == 'issued' %}selected{% endif %}>Issued</option>
+                <option value="suppressed" {% if status_filter == 'suppressed' %}selected{% endif %}>Suppressed</option>
+            </select>
+            <label class="form-label" style="margin-bottom:0">Segment:</label>
+            <select name="segment" class="form-select" onchange="this.form.submit()">
+                <option value="all" {% if segment_filter == 'all' %}selected{% endif %}>All Segments</option>
+                {% for s in segments %}
+                <option value="{{ s.id }}" {% if segment_filter|string == s.id|string %}selected{% endif %}>
+                    {{ s.booth_a_name }} &rarr; {{ s.booth_b_name }}
+                </option>
+                {% endfor %}
+            </select>
+        </form>
+    </div>
+</div>
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">{{ violations|length }} Violation{{ 's' if violations|length != 1 }}</span>
+    </div>
+    <div class="panel-body">
+        {% if violations %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Plate</th>
+                        <th>Corridor</th>
+                        <th>Speed</th>
+                        <th>Limit</th>
+                        <th>Over By</th>
+                        <th>Owner</th>
+                        <th>Status</th>
+                        <th>Timestamp</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in violations %}
+                    <tr class="clickable" onclick="showViolation({{ v.id }})">
+                        <td>#{{ v.id }}</td>
+                        <td><strong>{{ v.license_plate }}</strong></td>
+                        <td>{{ v.entry_booth }} &rarr; {{ v.exit_booth }}</td>
+                        <td class="speed-over">{{ v.calculated_speed_mph }} mph</td>
+                        <td>{{ v.speed_limit_mph }} mph</td>
+                        <td class="speed-over">+{{ v.over_limit_mph }} mph</td>
+                        <td>{{ v.owner_name or '—' }}</td>
+                        <td>
+                            <span class="badge badge-{{ v.status }}">{{ v.status }}</span>
+                        </td>
+                        <td class="text-sm text-muted">{{ v.created_at }}</td>
+                        <td><button class="btn btn-secondary btn-sm">Details</button></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No violations found matching your filters.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

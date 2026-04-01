@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% block title %}Officer Citations{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Officer-Issued Citations</h1>
+    <button class="btn btn-primary" onclick="openAddCitation()">+ Log New Citation</button>
+</div>
+
+<!-- Info Banner -->
+<div class="info-banner">
+    <div class="info-banner-icon">i</div>
+    <div>
+        <strong>How this works:</strong> When a law enforcement officer issues a speeding citation between two toll points,
+        log it here. The automated enforcement system checks this log before issuing its own ticket &mdash;
+        if the same vehicle was already cited by an officer on the <strong>same segment</strong> within the
+        last <strong>{{ dedup_window }} minutes</strong>, the automated ticket is suppressed to prevent double-ticketing.
+        <span class="text-sm text-muted" style="display:block; margin-top:4px;">
+            The deduplication window can be adjusted in <a href="/settings">Settings</a>.
+        </span>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="card-grid">
+    <div class="card">
+        <div class="card-label">Total Officer Citations</div>
+        <div class="card-value blue">{{ total }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Last 24 Hours</div>
+        <div class="card-value">{{ recent_24h }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Automated Tickets Suppressed</div>
+        <div class="card-value green">{{ suppressed }}</div>
+        <div class="text-sm text-muted mt-2">Prevented by officer citation dedup</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Dedup Window</div>
+        <div class="card-value">{{ dedup_window }}<span style="font-size:16px; font-weight:400;"> min</span></div>
+    </div>
+</div>
+
+<!-- Citations Table -->
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">{{ citations|length }} Citation{{ 's' if citations|length != 1 }} on File</span>
+    </div>
+    <div class="panel-body">
+        {% if citations %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Citation</th>
+                        <th>License Plate</th>
+                        <th>Vehicle / Owner</th>
+                        <th>Segment</th>
+                        <th>Officer</th>
+                        <th>Recorded Speed</th>
+                        <th>Citation Time</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in citations %}
+                    <tr class="clickable" onclick="showCitationDetail(this)" data-notes="{{ c.notes or '' }}" data-badge="{{ c.officer_badge or 'N/A' }}">
+                        <td><span class="citation-id">#{{ c.id }}</span></td>
+                        <td><strong class="plate-tag">{{ c.license_plate }}</strong></td>
+                        <td>
+                            {% if c.owner_name %}
+                                <div>{{ c.owner_name }}</div>
+                                <div class="text-sm text-muted">{{ c.vehicle_year }} {{ c.vehicle_make }} {{ c.vehicle_model }}</div>
+                            {% else %}
+                                <span class="text-muted">Not on file</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="segment-label">{{ c.booth_a_name }}</div>
+                            <div class="segment-arrow">&darr;</div>
+                            <div class="segment-label">{{ c.booth_b_name }}</div>
+                            <div class="text-sm text-muted">{{ c.speed_limit_mph }} mph zone</div>
+                        </td>
+                        <td>
+                            <div>{{ c.officer_name or '—' }}</div>
+                            {% if c.officer_badge %}
+                                <div class="text-sm text-muted">Badge {{ c.officer_badge }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if c.speed_recorded %}
+                                <span class="speed-over">{{ c.speed_recorded }} mph</span>
+                                <div class="text-sm text-muted">+{{ (c.speed_recorded - c.speed_limit_mph)|round(0)|int }} over</div>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div>{{ c.citation_time[:10] }}</div>
+                            <div class="text-sm text-muted">{{ c.citation_time[11:16] if c.citation_time|length > 11 else '' }}</div>
+                        </td>
+                        <td>
+                            <button class="btn btn-danger btn-sm" onclick="event.stopPropagation(); deleteCitation({{ c.id }})">Remove</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">&#128466;</div>
+            <p><strong>No officer citations on file</strong></p>
+            <p class="text-sm">Click "Log New Citation" to record an officer-issued speeding citation.<br>
+            This will prevent the automated system from double-ticketing the same driver on the same corridor.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function openAddCitation() {
+    const segments = {{ segments | tojson }};
+    let segmentOptions = segments.map(s =>
+        `<option value="${s.id}">${s.booth_a_name} &rarr; ${s.booth_b_name} (${s.speed_limit_mph} mph zone)</option>`
+    ).join('');
+
+    const now = new Date();
+    const localISO = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
+    const html = `
+        <form id="citation-form">
+            <div class="form-group">
+                <label class="form-label">License Plate <span class="required">*</span></label>
+                <input type="text" id="oc-plate" class="form-input" placeholder="ABC-1234"
+                       style="text-transform:uppercase; max-width:200px; font-weight:600; letter-spacing:0.05em;" required>
+                <div class="form-hint">Enter exactly as it appears on the plate</div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Toll Segment <span class="required">*</span></label>
+                <select id="oc-segment" class="form-select" required>${segmentOptions}</select>
+                <div class="form-hint">The corridor between two toll points where the stop occurred</div>
+            </div>
+            <div class="form-divider"></div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Officer Name</label>
+                    <input type="text" id="oc-officer" class="form-input" placeholder="Ofc. J. Smith">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Badge Number</label>
+                    <input type="text" id="oc-badge" class="form-input" placeholder="B-4521">
+                </div>
+            </div>
+            <div class="form-divider"></div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Citation Date/Time <span class="required">*</span></label>
+                    <input type="datetime-local" id="oc-time" class="form-input" value="${localISO}" required>
+                    <div class="form-hint">When the officer issued the citation</div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Radar Speed (mph)</label>
+                    <input type="number" id="oc-speed" class="form-input" placeholder="87" min="1" max="200" style="max-width:140px;">
+                    <div class="form-hint">Officer-recorded vehicle speed</div>
+                </div>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Notes</label>
+                <textarea id="oc-notes" class="form-input" rows="2" placeholder="e.g., Radar confirmed, pulled over on shoulder at mile 34"></textarea>
+            </div>
+            <div class="form-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                <button type="submit" class="btn btn-primary">Save Citation</button>
+            </div>
+        </form>
+    `;
+
+    openModal('Log Officer Citation', html);
+
+    document.getElementById('citation-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const submitBtn = this.querySelector('[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Saving...';
+
+        try {
+            const res = await fetch('/api/officer-citation', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    license_plate: document.getElementById('oc-plate').value,
+                    segment_id: document.getElementById('oc-segment').value,
+                    officer_name: document.getElementById('oc-officer').value,
+                    officer_badge: document.getElementById('oc-badge').value,
+                    citation_time: document.getElementById('oc-time').value,
+                    speed_recorded: document.getElementById('oc-speed').value,
+                    notes: document.getElementById('oc-notes').value,
+                })
+            });
+            if (res.ok) {
+                showToast('Officer citation logged successfully', 'success');
+                closeModal();
+                setTimeout(() => location.reload(), 800);
+            } else {
+                showToast('Failed to save — check required fields', 'error');
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save Citation';
+            }
+        } catch (err) {
+            showToast('Network error — please try again', 'error');
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Save Citation';
+        }
+    });
+}
+
+function showCitationDetail(row) {
+    const cells = row.querySelectorAll('td');
+    const notes = row.dataset.notes;
+    const badge = row.dataset.badge;
+
+    let html = '<div class="detail-grid">';
+    html += row_detail('Citation ID', cells[0].textContent.trim());
+    html += row_detail('License Plate', cells[1].textContent.trim());
+    html += row_detail('Vehicle / Owner', cells[2].innerHTML);
+    html += row_detail('Segment', cells[3].innerHTML);
+    html += row_detail('Officer', cells[4].textContent.trim());
+    html += row_detail('Badge', badge);
+    html += row_detail('Recorded Speed', cells[5].textContent.trim());
+    html += row_detail('Citation Time', cells[6].textContent.trim());
+    if (notes) {
+        html += row_detail('Notes', notes);
+    }
+    html += '</div>';
+
+    openModal('Citation Details', html);
+}
+
+function row_detail(label, value) {
+    return '<div class="detail-label">' + label + '</div><div class="detail-value">' + value + '</div>';
+}
+
+async function deleteCitation(id) {
+    if (!confirm('Remove this officer citation? This may allow the automated system to issue a ticket for this vehicle on this segment.')) return;
+    try {
+        await fetch('/api/officer-citation/' + id, { method: 'DELETE' });
+        showToast('Citation removed', 'success');
+        setTimeout(() => location.reload(), 800);
+    } catch (err) {
+        showToast('Failed to remove citation', 'error');
+    }
+}
+</script>
+{% endblock %}

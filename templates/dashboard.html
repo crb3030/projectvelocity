@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="page-title">Enforcement Dashboard</h1>
+    <button class="btn btn-primary" id="process-btn" onclick="processTransactions()">
+        Process New Transactions ({{ unprocessed }})
+    </button>
+</div>
+
+<div class="card-grid">
+    <div class="card">
+        <div class="card-label">Transactions Today</div>
+        <div class="card-value blue">{{ total_today }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Violations Issued Today</div>
+        <div class="card-value red">{{ violations_today }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Suppressed (Dedup) Today</div>
+        <div class="card-value yellow">{{ suppressed_today }}</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Pending Processing</div>
+        <div class="card-value">{{ unprocessed }}</div>
+    </div>
+</div>
+
+{% if top_corridors %}
+<div class="panel mb-4">
+    <div class="panel-header">
+        <span class="panel-title">Top Violation Corridors</span>
+    </div>
+    <div class="panel-body">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Corridor</th>
+                        <th>Violations Issued</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in top_corridors %}
+                    <tr>
+                        <td>{{ c.corridor }}</td>
+                        <td><strong>{{ c.cnt }}</strong></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="panel">
+    <div class="panel-header">
+        <span class="panel-title">Recent Toll Transactions</span>
+        <span class="text-muted text-sm">Last 50 transactions</span>
+    </div>
+    <div class="panel-body">
+        {% if transactions %}
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Plate</th>
+                        <th>Vehicle</th>
+                        <th>Booth</th>
+                        <th>Timestamp</th>
+                        <th>Transponder</th>
+                        <th>Payment</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for t in transactions %}
+                    <tr>
+                        <td><strong>{{ t.license_plate }}</strong></td>
+                        <td>{{ t.vehicle_class }}</td>
+                        <td>{{ t.booth_name }}</td>
+                        <td>{{ t.timestamp }}</td>
+                        <td>{{ t.transponder_id or '—' }}</td>
+                        <td>{{ t.payment_method }}</td>
+                        <td>${{ "%.2f"|format(t.amount_charged) }}</td>
+                        <td>
+                            {% if t.processed %}
+                                <span class="badge badge-issued">Processed</span>
+                            {% else %}
+                                <span class="badge badge-pending">Pending</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>No toll transactions found. Run the seed script to generate dummy data.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
