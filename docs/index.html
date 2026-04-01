@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard — State DOT Speed Enforcement</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="top-bar-inner">
+            <div class="logo">
+                <div class="logo-shield">&#9733;</div>
+                <div>
+                    <div class="logo-title">State Department of Transportation</div>
+                    <div class="logo-subtitle">Toll-Based Speed Enforcement System</div>
+                </div>
+            </div>
+            <div class="system-status">
+                <span class="status-dot active"></span>
+                <span>System Active</span>
+            </div>
+        </div>
+    </header>
+
+    <nav class="main-nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-link active">Dashboard</a>
+            <a href="violations.html" class="nav-link">Violations</a>
+            <a href="officer-citations.html" class="nav-link">Officer Citations</a>
+            <a href="emails.html" class="nav-link">Email Log</a>
+            <a href="settings.html" class="nav-link">Settings</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div class="page-header">
+            <h1 class="page-title">Enforcement Dashboard</h1>
+            <button class="btn btn-primary" onclick="simulateProcess()">
+                Process New Transactions (0)
+            </button>
+        </div>
+
+        <div class="card-grid">
+            <div class="card">
+                <div class="card-label">Total Transactions</div>
+                <div class="card-value blue" id="stat-transactions">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Violations Issued</div>
+                <div class="card-value red" id="stat-violations">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Suppressed (Dedup)</div>
+                <div class="card-value yellow" id="stat-suppressed">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Pending Processing</div>
+                <div class="card-value" id="stat-unprocessed">—</div>
+            </div>
+        </div>
+
+        <div class="panel mb-4">
+            <div class="panel-header">
+                <span class="panel-title">Top Violation Corridors</span>
+            </div>
+            <div class="panel-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr><th>Corridor</th><th>Violations Issued</th></tr>
+                        </thead>
+                        <tbody id="corridor-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Recent Toll Transactions</span>
+                <span class="text-muted text-sm">Last 30 transactions</span>
+            </div>
+            <div class="panel-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Plate</th><th>Vehicle</th><th>Booth</th><th>Timestamp</th>
+                                <th>Transponder</th><th>Payment</th><th>Amount</th><th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="txn-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            State DOT — Toll-Based Speed Enforcement System v1.0 &mdash; For authorized government use only
+        </div>
+    </footer>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 id="modal-title"></h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="app.js"></script>
+    <script>loadData().then(renderDashboard);</script>
+</body>
+</html>

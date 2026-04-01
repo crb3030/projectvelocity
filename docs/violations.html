@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Violations — State DOT Speed Enforcement</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="top-bar-inner">
+            <div class="logo">
+                <div class="logo-shield">&#9733;</div>
+                <div>
+                    <div class="logo-title">State Department of Transportation</div>
+                    <div class="logo-subtitle">Toll-Based Speed Enforcement System</div>
+                </div>
+            </div>
+            <div class="system-status">
+                <span class="status-dot active"></span>
+                <span>System Active</span>
+            </div>
+        </div>
+    </header>
+
+    <nav class="main-nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-link">Dashboard</a>
+            <a href="violations.html" class="nav-link active">Violations</a>
+            <a href="officer-citations.html" class="nav-link">Officer Citations</a>
+            <a href="emails.html" class="nav-link">Email Log</a>
+            <a href="settings.html" class="nav-link">Settings</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div class="page-header">
+            <h1 class="page-title">Violations Log</h1>
+        </div>
+
+        <div class="panel mb-4">
+            <div class="panel-body">
+                <div class="filters">
+                    <label class="form-label" style="margin-bottom:0">Status:</label>
+                    <select id="status-filter" class="form-select">
+                        <option value="all">All Statuses</option>
+                        <option value="issued">Issued</option>
+                        <option value="suppressed">Suppressed</option>
+                    </select>
+                    <label class="form-label" style="margin-bottom:0">Segment:</label>
+                    <select id="segment-filter" class="form-select">
+                        <option value="all">All Segments</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title" id="violation-count">— Violations</span>
+            </div>
+            <div class="panel-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Plate</th><th>Corridor</th><th>Speed</th>
+                                <th>Limit</th><th>Over By</th><th>Owner</th><th>Status</th>
+                                <th>Timestamp</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="violation-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            State DOT — Toll-Based Speed Enforcement System v1.0 &mdash; For authorized government use only
+        </div>
+    </footer>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 id="modal-title"></h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="app.js"></script>
+    <script>loadData().then(initViolationFilters);</script>
+</body>
+</html>

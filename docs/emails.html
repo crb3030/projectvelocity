@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Log — State DOT Speed Enforcement</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="top-bar-inner">
+            <div class="logo">
+                <div class="logo-shield">&#9733;</div>
+                <div>
+                    <div class="logo-title">State Department of Transportation</div>
+                    <div class="logo-subtitle">Toll-Based Speed Enforcement System</div>
+                </div>
+            </div>
+            <div class="system-status">
+                <span class="status-dot active"></span>
+                <span>System Active</span>
+            </div>
+        </div>
+    </header>
+
+    <nav class="main-nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-link">Dashboard</a>
+            <a href="violations.html" class="nav-link">Violations</a>
+            <a href="officer-citations.html" class="nav-link">Officer Citations</a>
+            <a href="emails.html" class="nav-link active">Email Log</a>
+            <a href="settings.html" class="nav-link">Settings</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div class="page-header">
+            <h1 class="page-title">Simulated Email Log</h1>
+            <span class="text-muted text-sm">Emails that would be sent to vehicle owners</span>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title" id="email-count">— Emails</span>
+            </div>
+            <div class="panel-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Recipient</th><th>Email</th><th>Subject</th>
+                                <th>Plate</th><th>Speed</th><th>Limit</th><th>Sent At</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="email-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            State DOT — Toll-Based Speed Enforcement System v1.0 &mdash; For authorized government use only
+        </div>
+    </footer>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 id="modal-title"></h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="app.js"></script>
+    <script>loadData().then(renderEmails);</script>
+</body>
+</html>

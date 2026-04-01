@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings — State DOT Speed Enforcement</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="top-bar-inner">
+            <div class="logo">
+                <div class="logo-shield">&#9733;</div>
+                <div>
+                    <div class="logo-title">State Department of Transportation</div>
+                    <div class="logo-subtitle">Toll-Based Speed Enforcement System</div>
+                </div>
+            </div>
+            <div class="system-status">
+                <span class="status-dot active"></span>
+                <span>System Active</span>
+            </div>
+        </div>
+    </header>
+
+    <nav class="main-nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-link">Dashboard</a>
+            <a href="violations.html" class="nav-link">Violations</a>
+            <a href="officer-citations.html" class="nav-link">Officer Citations</a>
+            <a href="emails.html" class="nav-link">Email Log</a>
+            <a href="settings.html" class="nav-link active">Settings</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div class="page-header">
+            <h1 class="page-title">System Settings</h1>
+        </div>
+
+        <div class="panel mb-4">
+            <div class="panel-header">
+                <span class="panel-title">Enforcement Configuration</span>
+            </div>
+            <div class="panel-body">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">System Status</label>
+                        <div class="toggle-wrap">
+                            <label class="toggle">
+                                <input type="checkbox" id="system-enabled" checked onchange="saveSettingsDemo()">
+                                <span class="toggle-slider"></span>
+                            </label>
+                            <span id="system-status-text">Active — Processing violations</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row mt-4">
+                    <div class="form-group">
+                        <label class="form-label" for="leniency">Leniency Threshold (MPH over limit)</label>
+                        <input type="number" id="leniency" class="form-input form-input-sm" value="10" min="0" max="50" onchange="saveSettingsDemo()">
+                        <div class="form-hint">
+                            Vehicles traveling at or below the speed limit + this value will NOT receive a ticket.
+                            <br>Example: If the limit is 70 mph and leniency is 10 mph, only vehicles exceeding 80 mph will be cited.
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="dedup-window">Deduplication Window (minutes)</label>
+                        <input type="number" id="dedup-window" class="form-input form-input-sm" value="60" min="0" max="1440" onchange="saveSettingsDemo()">
+                        <div class="form-hint">
+                            If a vehicle was cited by an officer on the same segment within this many minutes, the automated ticket will be suppressed.
+                            <br>This prevents duplicate citations for the same driver between the same toll points.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title">Toll Segments</span>
+                <span class="text-muted text-sm">Defined checkpoint corridors</span>
+            </div>
+            <div class="panel-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th><th>Entry Booth</th><th>Exit Booth</th>
+                                <th>Distance (mi)</th><th>Speed Limit (mph)</th><th>Leniency Threshold</th>
+                            </tr>
+                        </thead>
+                        <tbody id="segments-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            State DOT — Toll-Based Speed Enforcement System v1.0 &mdash; For authorized government use only
+        </div>
+    </footer>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 id="modal-title"></h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="app.js"></script>
+    <script>
+        loadData().then(function() {
+            const tbody = document.getElementById('segments-body');
+            const leniency = parseInt(document.getElementById('leniency').value || 10);
+            tbody.innerHTML = DATA.segments.map(s =>
+                `<tr>
+                    <td>${s.id}</td>
+                    <td>
+                        <strong>${s.booth_a_name}</strong>
+                        <div class="text-sm text-muted">${s.booth_a_location}</div>
+                    </td>
+                    <td>
+                        <strong>${s.booth_b_name}</strong>
+                        <div class="text-sm text-muted">${s.booth_b_location}</div>
+                    </td>
+                    <td>${s.distance_miles} mi</td>
+                    <td>${s.speed_limit_mph} mph</td>
+                    <td class="leniency-threshold">${s.speed_limit_mph + leniency} mph</td>
+                </tr>`
+            ).join('');
+        });
+    </script>
+</body>
+</html>

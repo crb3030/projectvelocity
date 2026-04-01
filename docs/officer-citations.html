@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Officer Citations — State DOT Speed Enforcement</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header class="top-bar">
+        <div class="top-bar-inner">
+            <div class="logo">
+                <div class="logo-shield">&#9733;</div>
+                <div>
+                    <div class="logo-title">State Department of Transportation</div>
+                    <div class="logo-subtitle">Toll-Based Speed Enforcement System</div>
+                </div>
+            </div>
+            <div class="system-status">
+                <span class="status-dot active"></span>
+                <span>System Active</span>
+            </div>
+        </div>
+    </header>
+
+    <nav class="main-nav">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-link">Dashboard</a>
+            <a href="violations.html" class="nav-link">Violations</a>
+            <a href="officer-citations.html" class="nav-link active">Officer Citations</a>
+            <a href="emails.html" class="nav-link">Email Log</a>
+            <a href="settings.html" class="nav-link">Settings</a>
+        </div>
+    </nav>
+
+    <main class="content">
+        <div class="page-header">
+            <h1 class="page-title">Officer-Issued Citations</h1>
+            <button class="btn btn-primary" onclick="openAddCitationDemo()">+ Log New Citation</button>
+        </div>
+
+        <div class="info-banner">
+            <div class="info-banner-icon">i</div>
+            <div>
+                <strong>How this works:</strong> When a law enforcement officer issues a speeding citation between two toll points,
+                log it here. The automated enforcement system checks this log before issuing its own ticket &mdash;
+                if the same vehicle was already cited by an officer on the <strong>same segment</strong> within the
+                last <strong>60 minutes</strong>, the automated ticket is suppressed to prevent double-ticketing.
+                <span class="text-sm text-muted" style="display:block; margin-top:4px;">
+                    The deduplication window can be adjusted in <a href="settings.html">Settings</a>.
+                </span>
+            </div>
+        </div>
+
+        <div class="card-grid">
+            <div class="card">
+                <div class="card-label">Total Officer Citations</div>
+                <div class="card-value blue" id="oc-total">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Last 24 Hours</div>
+                <div class="card-value" id="oc-recent">—</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Automated Tickets Suppressed</div>
+                <div class="card-value green" id="oc-suppressed">—</div>
+                <div class="text-sm text-muted mt-2">Prevented by officer citation dedup</div>
+            </div>
+            <div class="card">
+                <div class="card-label">Dedup Window</div>
+                <div class="card-value">60<span style="font-size:16px; font-weight:400;"> min</span></div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <div class="panel-header">
+                <span class="panel-title" id="oc-count">— Citations on File</span>
+            </div>
+            <div class="panel-body">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Citation</th><th>License Plate</th><th>Vehicle / Owner</th>
+                                <th>Segment</th><th>Officer</th><th>Recorded Speed</th>
+                                <th>Citation Time</th><th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="oc-body"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-inner">
+            State DOT — Toll-Based Speed Enforcement System v1.0 &mdash; For authorized government use only
+        </div>
+    </footer>
+
+    <div id="modal-overlay" class="modal-overlay hidden">
+        <div class="modal" id="modal">
+            <div class="modal-header">
+                <h3 id="modal-title"></h3>
+                <button class="modal-close" onclick="closeModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body"></div>
+        </div>
+    </div>
+    <div id="toast" class="toast hidden"></div>
+
+    <script src="app.js"></script>
+    <script>loadData().then(renderOfficerCitations);</script>
+</body>
+</html>
