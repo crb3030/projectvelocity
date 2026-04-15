@@ -188,11 +188,53 @@ function simulateProcess() {
                 continue;
             }
 
-            // Issue violation
-            issuedPlates[dedupKey] = true;
             const owner = DATA.owners[plate];
             const entryBooth = entry.booth_id < exit.booth_id ? seg.a_name : seg.b_name;
             const exitBooth = entry.booth_id < exit.booth_id ? seg.b_name : seg.a_name;
+
+            // Check for officer citation dedup — if an officer already cited
+            // this plate on the same segment within the dedup window, suppress
+            // the automated ticket to prevent double-ticketing
+            const DEDUP_MINUTES = 60;
+            const dedupCutoff = new Date(exitTime.getTime() - DEDUP_MINUTES * 60 * 1000);
+            const officerCitation = DATA.officer_citations.find(oc =>
+                oc.license_plate === plate &&
+                oc.segment_id === seg.seg_id &&
+                new Date(oc.citation_time) >= dedupCutoff
+            );
+
+            if (officerCitation) {
+                // Suppressed — officer already cited this driver on this segment
+                const suppReason = 'Officer citation #' + officerCitation.id
+                    + ' by ' + (officerCitation.officer_name || 'Unknown')
+                    + ' (Badge: ' + (officerCitation.officer_badge || 'N/A') + ')'
+                    + ' on same segment within ' + DEDUP_MINUTES + ' min';
+
+                const suppViolation = {
+                    id: violationId++,
+                    license_plate: plate,
+                    segment_id: seg.seg_id,
+                    entry_booth: entryBooth,
+                    exit_booth: exitBooth,
+                    entry_time: entry.timestamp,
+                    exit_time: exit.timestamp,
+                    calculated_speed_mph: avgSpeed,
+                    speed_limit_mph: seg.limit,
+                    leniency_mph: LENIENCY,
+                    over_limit_mph: overLimit,
+                    status: 'suppressed',
+                    owner_name: owner ? owner.owner_name : null,
+                    suppression_reason: suppReason,
+                    created_at: new Date().toISOString()
+                };
+                DATA.violations.push(suppViolation);
+                issuedPlates[dedupKey] = true;
+                newSuppressed++;
+                continue;
+            }
+
+            // Issue violation — no officer citation found
+            issuedPlates[dedupKey] = true;
 
             const violation = {
                 id: violationId++,
@@ -256,6 +298,7 @@ function simulateProcess() {
     DATA.stats.violations_today += newViolations;
     DATA.stats.suppressed_today += newSuppressed;
     DATA.stats.unprocessed = 0;
+    DATA.stats.officer_suppressed = DATA.violations.filter(v => v.status === 'suppressed' && v.suppression_reason && v.suppression_reason.indexOf('Officer citation') === 0).length;
 
     // Update corridor stats
     const corridorArr = Object.keys(corridorCounts).map(c => ({corridor: c, cnt: corridorCounts[c]}));
@@ -268,7 +311,10 @@ function simulateProcess() {
     // Re-render the dashboard
     renderDashboard();
 
-    showToast('Processed ' + unprocessed.length + ' transactions — ' + newViolations + ' violations issued, ' + newSuppressed + ' suppressed', 'success');
+    const officerSuppCount = DATA.violations.filter(v => v.status === 'suppressed' && v.suppression_reason && v.suppression_reason.indexOf('Officer citation') === 0).length;
+    let msg = 'Processed ' + unprocessed.length + ' transactions — ' + newViolations + ' violations issued, ' + newSuppressed + ' suppressed';
+    if (officerSuppCount > 0) msg += ' (' + officerSuppCount + ' by officer dedup)';
+    showToast(msg, 'success');
 }
 
 /* ── Reset Demo ─────────────────────────────────────────────────── */
