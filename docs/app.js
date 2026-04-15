@@ -2,9 +2,19 @@
 let DATA = {};
 
 async function loadData() {
+    // Check if we have processed data in sessionStorage (persists across page navigation)
+    const cached = sessionStorage.getItem('tollEnforcementData');
+    if (cached) {
+        DATA = JSON.parse(cached);
+        return DATA;
+    }
     const res = await fetch('data.json');
     DATA = await res.json();
     return DATA;
+}
+
+function saveData() {
+    sessionStorage.setItem('tollEnforcementData', JSON.stringify(DATA));
 }
 
 /* ── Toast ────────────────────────────────────────────────────────── */
@@ -96,12 +106,169 @@ function renderDashboard() {
 }
 
 function simulateProcess() {
-    const count = DATA.stats ? DATA.stats.unprocessed : 0;
-    showToast('Demo mode: Processed ' + count + ' transactions — 31 violations issued, 41 suppressed', 'success');
-    // Update button to show 0 after "processing"
-    const btn = document.getElementById('process-btn');
-    if (btn) btn.textContent = 'Process New Transactions (0)';
-    document.getElementById('stat-unprocessed').textContent = '0';
+    const LENIENCY = 10; // mph over limit before issuing violation
+
+    // Build segment lookup dynamically from DATA.segments
+    // Map booth names to IDs (booths appear in order across segments)
+    const boothNameToId = {};
+    let nextId = 1;
+    DATA.segments.forEach(s => {
+        if (!(s.booth_a_name in boothNameToId)) boothNameToId[s.booth_a_name] = nextId++;
+        if (!(s.booth_b_name in boothNameToId)) boothNameToId[s.booth_b_name] = nextId++;
+    });
+
+    const segLookup = {};
+    DATA.segments.forEach(s => {
+        const aId = boothNameToId[s.booth_a_name];
+        const bId = boothNameToId[s.booth_b_name];
+        const entry = {
+            a: aId, b: bId, seg_id: s.id,
+            dist: s.distance_miles, limit: s.speed_limit_mph,
+            a_name: s.booth_a_name, b_name: s.booth_b_name
+        };
+        segLookup[aId + '_' + bId] = entry;
+        segLookup[bId + '_' + aId] = entry; // direction doesn't matter for avg speed
+    });
+
+    // Gather unprocessed transactions from ALL transactions (not just display 30)
+    const allTxns = DATA.allTransactions || DATA.transactions;
+    const unprocessed = allTxns.filter(t => !t.processed);
+    if (unprocessed.length === 0) {
+        showToast('No unprocessed transactions to process.', '');
+        return;
+    }
+
+    const byPlate = {};
+    unprocessed.forEach(t => {
+        if (!byPlate[t.license_plate]) byPlate[t.license_plate] = [];
+        byPlate[t.license_plate].push(t);
+    });
+
+    let violationId = (DATA.violations.length > 0) ? Math.max(...DATA.violations.map(v => v.id)) + 1 : 1001;
+    let emailId = (DATA.emails.length > 0) ? Math.max(...DATA.emails.map(e => e.id)) + 1 : 5001;
+    let newViolations = 0;
+    let newSuppressed = 0;
+    const corridorCounts = {};
+    const issuedPlates = {}; // track plates we've already issued on a segment for dedup
+
+    // For each plate, sort by timestamp and find consecutive booth pairs
+    Object.keys(byPlate).forEach(plate => {
+        const txns = byPlate[plate].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        for (let i = 0; i < txns.length - 1; i++) {
+            const entry = txns[i];
+            const exit = txns[i + 1];
+
+            // Check if these two booths form a known segment
+            const key = entry.booth_id + '_' + exit.booth_id;
+            const seg = segLookup[key];
+            if (!seg) continue;
+
+            // Calculate average speed
+            const entryTime = new Date(entry.timestamp);
+            const exitTime = new Date(exit.timestamp);
+            const hours = (exitTime - entryTime) / (1000 * 60 * 60);
+            if (hours <= 0) continue;
+
+            const avgSpeed = Math.round(seg.dist / hours);
+            const overLimit = avgSpeed - seg.limit;
+
+            if (overLimit <= 0) continue; // not speeding
+
+            // Dedup: only one violation per plate per segment per processing run
+            const dedupKey = plate + '_' + seg.seg_id;
+            if (issuedPlates[dedupKey]) {
+                newSuppressed++;
+                continue;
+            }
+
+            if (overLimit <= LENIENCY) {
+                // Within leniency — suppress
+                newSuppressed++;
+                continue;
+            }
+
+            // Issue violation
+            issuedPlates[dedupKey] = true;
+            const owner = DATA.owners[plate];
+            const entryBooth = entry.booth_id < exit.booth_id ? seg.a_name : seg.b_name;
+            const exitBooth = entry.booth_id < exit.booth_id ? seg.b_name : seg.a_name;
+
+            const violation = {
+                id: violationId++,
+                license_plate: plate,
+                segment_id: seg.seg_id,
+                entry_booth: entryBooth,
+                exit_booth: exitBooth,
+                entry_time: entry.timestamp,
+                exit_time: exit.timestamp,
+                calculated_speed_mph: avgSpeed,
+                speed_limit_mph: seg.limit,
+                leniency_mph: LENIENCY,
+                over_limit_mph: overLimit,
+                status: 'issued',
+                owner_name: owner ? owner.owner_name : null,
+                suppression_reason: null,
+                created_at: new Date().toISOString()
+            };
+            DATA.violations.push(violation);
+            newViolations++;
+
+            // Track corridor counts
+            const corridorLabel = entryBooth + ' → ' + exitBooth;
+            corridorCounts[corridorLabel] = (corridorCounts[corridorLabel] || 0) + 1;
+
+            // Generate notification email if owner is on file
+            if (owner) {
+                const email = {
+                    id: emailId++,
+                    violation_id: violation.id,
+                    recipient_name: owner.owner_name,
+                    recipient_email: owner.owner_email,
+                    license_plate: plate,
+                    calculated_speed_mph: avgSpeed,
+                    speed_limit_mph: seg.limit,
+                    subject: 'Speed Violation Notice — ' + plate + ' (' + avgSpeed + ' mph in ' + seg.limit + ' mph zone)',
+                    body: 'Dear ' + owner.owner_name + ',\n\n'
+                        + 'This notice is to inform you that a speed violation has been recorded for vehicle '
+                        + plate + ' (' + (owner.vehicle_year + ' ' + owner.vehicle_make + ' ' + owner.vehicle_model) + ').\n\n'
+                        + 'Violation Details:\n'
+                        + '  Corridor: ' + entryBooth + ' → ' + exitBooth + '\n'
+                        + '  Entry Time: ' + entry.timestamp.replace('T', ' ') + '\n'
+                        + '  Exit Time: ' + exit.timestamp.replace('T', ' ') + '\n'
+                        + '  Calculated Avg Speed: ' + avgSpeed + ' mph\n'
+                        + '  Posted Speed Limit: ' + seg.limit + ' mph\n'
+                        + '  Amount Over Limit: +' + overLimit + ' mph\n\n'
+                        + 'You may contest this violation within 30 days by contacting the State Department of Transportation.\n\n'
+                        + 'Sincerely,\nState DOT — Toll-Based Speed Enforcement Division',
+                    simulated_sent_at: new Date().toISOString()
+                };
+                DATA.emails.push(email);
+            }
+        }
+    });
+
+    // Mark all transactions as processed
+    allTxns.forEach(t => { t.processed = 1; });
+    DATA.transactions.forEach(t => { t.processed = 1; });
+
+    // Update stats
+    DATA.stats.violations_today += newViolations;
+    DATA.stats.suppressed_today += newSuppressed;
+    DATA.stats.unprocessed = 0;
+
+    // Update corridor stats
+    const corridorArr = Object.keys(corridorCounts).map(c => ({corridor: c, cnt: corridorCounts[c]}));
+    corridorArr.sort((a, b) => b.cnt - a.cnt);
+    DATA.stats.corridors = corridorArr;
+
+    // Persist to sessionStorage so other pages see the results
+    saveData();
+
+    // Re-render the dashboard
+    renderDashboard();
+
+    showToast('Processed ' + unprocessed.length + ' transactions — ' + newViolations + ' violations issued, ' + newSuppressed + ' suppressed', 'success');
 }
 
 /* ── Violations ──────────────────────────────────────────────────── */
