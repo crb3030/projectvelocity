@@ -271,6 +271,163 @@ function simulateProcess() {
     showToast('Processed ' + unprocessed.length + ' transactions — ' + newViolations + ' violations issued, ' + newSuppressed + ' suppressed', 'success');
 }
 
+/* ── Reset Demo ─────────────────────────────────────────────────── */
+function resetDemo() {
+    // Clear any cached processed state
+    sessionStorage.removeItem('tollEnforcementData');
+
+    // Random helpers
+    function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+    function randChoice(arr) { return arr[randInt(0, arr.length - 1)]; }
+    function randPlate() {
+        const L = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        return L[randInt(0,25)] + L[randInt(0,25)] + L[randInt(0,25)] + '-' + randInt(1000,9999);
+    }
+
+    const FIRST = ['James','Mary','Robert','Patricia','John','Jennifer','Michael','Linda','David','Elizabeth','William','Barbara','Richard','Susan','Thomas','Sarah','Charles','Karen','Daniel','Lisa','Matthew','Nancy','Anthony','Emily','Joshua','Donna','Kevin','Carol','Brian','Amanda','George','Melissa'];
+    const LAST = ['Smith','Johnson','Williams','Brown','Jones','Garcia','Miller','Davis','Rodriguez','Martinez','Hernandez','Wilson','Anderson','Thomas','Taylor','Moore','Jackson','Martin','Lee','Thompson','White','Harris','Clark','Lewis','Robinson'];
+    const MAKES = [['Toyota','Camry'],['Honda','Accord'],['Ford','F-150'],['Chevrolet','Silverado'],['Toyota','RAV4'],['Honda','CR-V'],['Ford','Explorer'],['Tesla','Model 3'],['Tesla','Model Y'],['BMW','3 Series'],['Jeep','Grand Cherokee'],['Dodge','Ram 1500'],['Nissan','Altima'],['Hyundai','Tucson'],['Kia','Sorento'],['Subaru','Outback']];
+    const CLASSES = ['Sedan','SUV','Truck','Sedan','SUV','Sedan','Motorcycle','Van'];
+    const PAYMENTS = ['E-ZPass','E-ZPass','E-ZPass','SunPass','Cash','License Plate Toll'];
+
+    // Build booth name-to-id map from segments
+    const boothNameToId = {};
+    let bid = 1;
+    DATA.segments.forEach(s => {
+        if (!(s.booth_a_name in boothNameToId)) boothNameToId[s.booth_a_name] = bid++;
+        if (!(s.booth_b_name in boothNameToId)) boothNameToId[s.booth_b_name] = bid++;
+    });
+    const allBoothNames = Object.keys(boothNameToId);
+
+    // Generate 50 fresh vehicles
+    const owners = {};
+    const vehicles = [];
+    for (let i = 0; i < 50; i++) {
+        const plate = randPlate();
+        const first = randChoice(FIRST);
+        const last = randChoice(LAST);
+        const mm = randChoice(MAKES);
+        const year = randInt(2015, 2026);
+        const transponder = Math.random() < 0.7 ? 'EZP-' + randInt(100000, 999999) : null;
+        vehicles.push({ plate, transponder, vclass: randChoice(CLASSES) });
+        owners[plate] = {
+            license_plate: plate, transponder_id: transponder,
+            owner_name: first + ' ' + last,
+            owner_email: first.toLowerCase() + '.' + last.toLowerCase() + '@email.com',
+            address: randInt(100,9999) + ' ' + randChoice(['Oak St','Maple Ave','Cedar Ln','Pine Rd','Elm Dr','Main St','Park Ave','Lake Dr']) + ', ' + randChoice(['Charlotte, NC 28201','Raleigh, NC 27601','Nashville, TN 37201','Richmond, VA 23219','Columbus, OH 43215']),
+            vehicle_make: mm[0], vehicle_model: mm[1], vehicle_year: year,
+        };
+    }
+
+    // Generate ~450 transactions
+    const now = new Date();
+    const allTxns = [];
+    let txnId = 1;
+
+    // Trip-based transactions (consecutive booths)
+    for (let t = 0; t < 130; t++) {
+        const v = randChoice(vehicles);
+        const startIdx = randInt(0, DATA.segments.length - 1);
+        const numSegs = randInt(1, Math.min(4, DATA.segments.length - startIdx));
+        let tripTime = new Date(now.getTime() - randInt(1800000, 172800000)); // 0.5-48 hrs ago
+        const isSpeeder = Math.random() < 0.35;
+        const speedFactor = isSpeeder ? 1.1 + Math.random() * 0.35 : 0.8 + Math.random() * 0.25;
+
+        for (let s = 0; s <= numSegs; s++) {
+            const si = startIdx + s;
+            if (si >= DATA.segments.length) break;
+            const boothName = (s === 0) ? DATA.segments[si].booth_a_name : DATA.segments[startIdx + s].booth_a_name;
+            const boothId = boothNameToId[boothName];
+            let pay = randChoice(PAYMENTS);
+            if (!v.transponder && (pay === 'E-ZPass' || pay === 'SunPass')) pay = 'License Plate Toll';
+
+            allTxns.push({
+                id: txnId++, license_plate: v.plate, vehicle_class: v.vclass,
+                transponder_id: v.transponder, booth_id: boothId, booth_name: boothName,
+                timestamp: tripTime.toISOString().substring(0, 19),
+                amount_charged: Math.round((1.5 + Math.random() * 5) * 100) / 100,
+                payment_method: pay, image_url: '/images/capture_' + v.plate + '_' + boothId + '.jpg',
+                processed: 0,
+            });
+
+            if (s < numSegs && (startIdx + s) < DATA.segments.length) {
+                const seg = DATA.segments[startIdx + s];
+                const speed = seg.speed_limit_mph * speedFactor;
+                const hours = seg.distance_miles / speed * (0.95 + Math.random() * 0.1);
+                tripTime = new Date(tripTime.getTime() + hours * 3600000);
+            }
+        }
+    }
+
+    // Standalone transactions
+    for (let t = 0; t < 90; t++) {
+        const v = randChoice(vehicles);
+        const boothName = randChoice(allBoothNames);
+        const boothId = boothNameToId[boothName];
+        const ts = new Date(now.getTime() - randInt(1800000, 172800000));
+        let pay = randChoice(PAYMENTS);
+        if (!v.transponder && (pay === 'E-ZPass' || pay === 'SunPass')) pay = 'License Plate Toll';
+
+        allTxns.push({
+            id: txnId++, license_plate: v.plate, vehicle_class: v.vclass,
+            transponder_id: v.transponder, booth_id: boothId, booth_name: boothName,
+            timestamp: ts.toISOString().substring(0, 19),
+            amount_charged: Math.round((1.5 + Math.random() * 5) * 100) / 100,
+            payment_method: pay, image_url: '/images/capture_' + v.plate + '_' + boothId + '.jpg',
+            processed: 0,
+        });
+    }
+
+    allTxns.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+
+    const todayStr = now.toISOString().substring(0, 10);
+    const todayCount = allTxns.filter(t => t.timestamp.substring(0, 10) === todayStr).length;
+
+    // Generate fresh officer citations
+    const OFFICERS = [['Ofc. M. Rodriguez','B-1142'],['Ofc. T. Williams','B-2287'],['Ofc. J. Chen','B-3391'],['Ofc. R. Patel','B-4456'],['Sgt. K. Davis','B-5501']];
+    const citations = [];
+    for (let i = 0; i < 12; i++) {
+        const v = randChoice(vehicles);
+        const seg = randChoice(DATA.segments);
+        const ofc = randChoice(OFFICERS);
+        const ct = new Date(now.getTime() - randInt(360000, 28800000));
+        const o = owners[v.plate] || {};
+        citations.push({
+            id: i + 1, license_plate: v.plate, segment_id: seg.id,
+            booth_a_name: seg.booth_a_name, booth_b_name: seg.booth_b_name,
+            speed_limit_mph: seg.speed_limit_mph,
+            officer_name: ofc[0], officer_badge: ofc[1],
+            citation_time: ct.toISOString().substring(0, 19),
+            speed_recorded: seg.speed_limit_mph + randInt(12, 35),
+            notes: 'Radar confirmed — pulled over on shoulder',
+            created_at: ct.toISOString().substring(0, 19),
+            owner_name: o.owner_name || null, vehicle_make: o.vehicle_make || null,
+            vehicle_model: o.vehicle_model || null, vehicle_year: o.vehicle_year || null,
+        });
+    }
+
+    // Update DATA in place
+    DATA.allTransactions = allTxns;
+    DATA.transactions = allTxns.slice(0, 30);
+    DATA.violations = [];
+    DATA.emails = [];
+    DATA.officer_citations = citations;
+    DATA.owners = owners;
+    DATA.stats = {
+        total_today: todayCount,
+        violations_today: 0,
+        suppressed_today: 0,
+        unprocessed: allTxns.length,
+        total_officer: citations.length,
+        officer_suppressed: 0,
+        corridors: [],
+    };
+
+    saveData();
+    renderDashboard();
+    showToast('Demo reset — ' + allTxns.length + ' new transactions generated with ' + Object.keys(owners).length + ' vehicles', 'success');
+}
+
 /* ── Violations ──────────────────────────────────────────────────── */
 function renderViolations(statusFilter, segmentFilter) {
     let list = DATA.violations;
