@@ -36,9 +36,14 @@
     <main class="content">
         <div class="page-header">
             <h1 class="page-title">Enforcement Dashboard</h1>
-            <button class="btn btn-primary" id="process-btn" onclick="simulateProcess()">
-                Process New Transactions (0)
-            </button>
+            <div style="display:flex; gap:10px; align-items:center;">
+                <button class="btn btn-primary" id="process-btn" onclick="simulateProcess()">
+                    Process New Transactions (0)
+                </button>
+                <button class="btn btn-secondary" onclick="resetDemo()" title="Generate fresh random transactions for demo">
+                    Reset Demo
+                </button>
+            </div>
         </div>
 
         <div class="card-grid">
